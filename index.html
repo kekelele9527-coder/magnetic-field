@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>磁铁磁感线 · 3D 交互</title>
+<style>
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;
+    background:radial-gradient(circle at 50% 40%,#0c1a33 0%,#05070f 55%,#000 100%);
+    font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+    -webkit-tap-highlight-color:transparent;}
+  #c{display:block;width:100%;height:100%;touch-action:none;cursor:grab;}
+  #c:active{cursor:grabbing;}
+  .hud{position:fixed;color:#cfe9ff;pointer-events:none;user-select:none;
+       text-shadow:0 0 12px rgba(56,232,255,.35);}
+  #title{top:14px;left:16px;font-size:13px;letter-spacing:.5px;opacity:.9;}
+  #title b{color:#fff;font-size:16px;font-weight:600;}
+  #fps{top:14px;right:16px;font-size:11px;opacity:.4;font-variant-numeric:tabular-nums;}
+
+  #panel{position:fixed;left:10px;right:10px;bottom:10px;
+    background:rgba(8,16,30,.72);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border:1px solid rgba(80,180,255,.18);border-radius:16px;padding:10px 14px 12px;
+    box-shadow:0 8px 32px rgba(0,0,0,.55);}
+  #scenes{display:flex;gap:8px;margin-bottom:10px;}
+  #scenes button{flex:1;padding:8px 4px;font-size:12.5px;color:#9fc6e8;
+    background:rgba(40,90,150,.22);border:1px solid rgba(80,180,255,.22);
+    border-radius:10px;cursor:pointer;transition:.18s;font-family:inherit;}
+  #scenes button.active{color:#04121f;background:linear-gradient(180deg,#6fe3ff,#2bb8d6);
+    border-color:#7fe9ff;font-weight:600;box-shadow:0 0 16px rgba(56,232,255,.45);}
+  .row{display:flex;align-items:center;gap:10px;margin-top:9px;}
+  .row label{font-size:12px;color:#8fb6d6;width:32px;flex:0 0 32px;}
+  .row input[type=range]{flex:1;height:22px;-webkit-appearance:none;background:transparent;}
+  .row input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;
+    background:linear-gradient(90deg,rgba(56,232,255,.5),rgba(56,232,255,.12));}
+  .row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;
+    margin-top:-6px;border-radius:50%;background:#7fe9ff;box-shadow:0 0 10px #38e8ff;cursor:pointer;}
+  .row input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:rgba(56,232,255,.3);}
+  .row input[type=range]::-moz-range-thumb{width:16px;height:16px;border:none;border-radius:50%;
+    background:#7fe9ff;box-shadow:0 0 10px #38e8ff;}
+  .val{font-size:11.5px;color:#7fe9ff;width:38px;text-align:right;flex:0 0 38px;
+    font-variant-numeric:tabular-nums;}
+  .axgroup{display:flex;gap:4px;flex:0 0 auto;}
+  .axgroup button{width:26px;height:26px;padding:0;font-size:11px;line-height:1;color:#8fb6d6;
+    background:rgba(40,90,150,.22);border:1px solid rgba(80,180,255,.22);border-radius:7px;
+    cursor:pointer;font-family:inherit;transition:.16s;}
+  .axgroup button.active{color:#04121f;background:linear-gradient(180deg,#6fe3ff,#2bb8d6);
+    border-color:#7fe9ff;font-weight:700;box-shadow:0 0 10px rgba(56,232,255,.45);}
+  #tip{font-size:11px;color:#5f87a8;text-align:center;margin-top:8px;line-height:1.5;}
+
+  /* ---- 顶部模式切换 ---- */
+  #tabs{position:fixed;top:12px;left:14px;display:flex;gap:6px;z-index:20;}
+  #tabs button{padding:7px 15px;font-size:12.5px;color:#9fc6e8;
+    background:rgba(8,16,30,.72);border:1px solid rgba(80,180,255,.22);
+    border-radius:20px;cursor:pointer;font-family:inherit;transition:.18s;
+    backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);}
+  #tabs button.active{color:#04121f;background:linear-gradient(180deg,#6fe3ff,#2bb8d6);
+    border-color:#7fe9ff;font-weight:600;box-shadow:0 0 14px rgba(56,232,255,.4);}
+
+  /* ---- 电流表 ---- */
+  #meter{position:fixed;right:14px;bottom:168px;width:108px;padding:9px 8px 7px;
+    background:rgba(8,16,30,.78);border:1px solid rgba(80,180,255,.2);border-radius:14px;
+    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);display:none;z-index:15;}
+  #meterVal{font-size:13px;color:#7fe9ff;text-align:center;font-variant-numeric:tabular-nums;
+    margin-top:-4px;}
+  #meterDir{font-size:10.5px;color:#5f87a8;text-align:center;margin-top:2px;}
+
+  /* ---- 电磁感应底部面板 ---- */
+  #panelInd{position:fixed;left:10px;right:10px;bottom:10px;
+    background:rgba(8,16,30,.72);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border:1px solid rgba(80,180,255,.18);border-radius:16px;padding:12px 14px;
+    box-shadow:0 8px 32px rgba(0,0,0,.55);display:none;}
+  #panelInd .prow{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  #panelInd .prow + .prow{margin-top:10px;}
+  #panelInd .hint{font-size:12px;color:#8fb6d6;}
+  #resetRod{padding:6px 14px;font-size:11.5px;color:#9fc6e8;background:rgba(40,90,150,.25);
+    border:1px solid rgba(80,180,255,.25);border-radius:9px;cursor:pointer;font-family:inherit;}
+  #panelInd .stat{font-size:12px;color:#7fe9ff;font-variant-numeric:tabular-nums;}
+  #panelInd .stat b{color:#fff;font-size:13.5px;font-weight:600;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="tabs">
+  <button data-m="field" class="active">磁感线</button>
+  <button data-m="induction">电磁感应</button>
+</div>
+<div class="hud" id="fps">-- FPS</div>
+
+<div id="meter">
+  <svg viewBox="0 0 100 66" width="100%" style="display:block">
+    <path d="M12 58 A38 38 0 0 1 88 58" fill="none" stroke="#274a68" stroke-width="2.5"/>
+    <line id="needle" x1="50" y1="58" x2="50" y2="26" stroke="#ff7a6b"
+          stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="50" cy="58" r="3" fill="#7fe9ff"/>
+  </svg>
+  <div id="meterVal">0.00 A</div>
+  <div id="meterDir">—</div>
+</div>
+
+<div id="panelInd">
+  <div class="prow">
+    <span class="hint" id="indHint">拖动电线，切割磁感线</span>
+    <button id="resetRod">复位</button>
+  </div>
+  <div class="prow">
+    <span class="stat">v = <b id="vVal">0.00</b> m/s</span>
+    <span class="stat">E = <b id="eVal">0.00</b> V</span>
+    <span class="stat">I = <b id="iVal">0.00</b> A</span>
+  </div>
+</div>
+
+<div id="panel">
+  <div id="scenes">
+    <button data-s="bar" class="active">条形磁铁</button>
+    <button data-s="horseshoe">蹄形磁铁</button>
+    <button data-s="solenoid">通电螺线管</button>
+  </div>
+  <div class="row">
+    <label>剖面</label>
+    <div class="axgroup" id="axes">
+      <button data-a="x">X</button>
+      <button data-a="y">Y</button>
+      <button data-a="z" class="active">Z</button>
+    </div>
+    <input id="cut" type="range" min="0" max="100" value="0">
+    <span class="val" id="cutv">关</span>
+  </div>
+  <div class="row">
+    <label>强度</label>
+    <input id="str" type="range" min="40" max="200" value="100">
+    <span class="val" id="strv">1.0×</span>
+  </div>
+  <div id="tip">拖动旋转 · 双指缩放 · 点击磁感线可高亮追踪</div>
+</div>
+
+<script src="https://cdn.bootcdn.net/ajax/libs/three.js/r128/three.min.js"></script>
+<script>window.THREE||document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"><\/script>');</script>
+<script>window.THREE||document.write('<script src="https://unpkg.com/three@0.128.0/build/three.min.js"><\/script>');</script>
+<script>
+if(!window.THREE){
+  document.body.innerHTML='<div style="color:#cfe9ff;font-family:sans-serif;padding:40px;line-height:2">'+
+    '3D 引擎加载失败，请检查网络后刷新。</div>';
+}
+</script>
+<script>
+(function(){
+"use strict";
+if(!window.THREE) return;
+
+// ================= 渲染器 / 场景 =================
+var canvas = document.getElementById('c');
+var renderer = new THREE.WebGLRenderer({canvas:canvas, antialias:true, alpha:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0x000000, 0);
+renderer.localClippingEnabled = true;
+
+var scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x05070f, 0.05);
+var camera = new THREE.PerspectiveCamera(52, window.innerWidth/window.innerHeight, 0.1, 200);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+var l1 = new THREE.DirectionalLight(0xffffff, 0.95); l1.position.set(6,9,7); scene.add(l1);
+var l2 = new THREE.DirectionalLight(0x4a8bff, 0.45); l2.position.set(-7,-5,-6); scene.add(l2);
+var l3 = new THREE.PointLight(0x38e8ff, 0.55, 22); l3.position.set(0,0,3); scene.add(l3);
+
+// ================= 全局状态 =================
+var root = new THREE.Group(); scene.add(root);   // 当前场景的所有物体
+var capGroup = new THREE.Group(); scene.add(capGroup); // 剖面封口截面
+var lines = [];        // 每条磁感线的点数组
+var lineMeshes = [];   // 每条线的 Mesh（用于点击拾取）
+var lineMats = [];     // 每条线的材质（独立，便于高亮）
+var particles = null, pGeo = null, prog = null;
+var magnetMats = [];   // 磁铁材质（用于调强度发光）
+var clipPlane = new THREE.Plane(new THREE.Vector3(0,0,-1), 6); // 剖面裁剪
+var strength = 1.0;
+var hlIndex = -1;
+
+// ================= 磁场：多磁荷叠加 =================
+var charges = [];      // [{p:Vector3, q:number}]
+var _t = new THREE.Vector3();
+
+function field(p, out){
+  out.set(0,0,0);
+  for(var i=0;i<charges.length;i++){
+    var c = charges[i];
+    _t.subVectors(p, c.p);
+    var d = Math.max(_t.length(), 0.13);
+    out.addScaledVector(_t, c.q/(d*d*d));
+  }
+  return out.multiplyScalar(strength);
+}
+
+// ================= 流线追踪（RK4） =================
+var k1=new THREE.Vector3(),k2=new THREE.Vector3(),k3=new THREE.Vector3(),k4=new THREE.Vector3();
+var tmpV=new THREE.Vector3(), dirV=new THREE.Vector3(), curV=new THREE.Vector3();
+
+function trace(start, maxLen){
+  var pts = [];
+  curV.copy(start);
+  var step = 0.06;
+  maxLen = maxLen || 5.0;
+  for(var i=0;i<1500;i++){
+    pts.push(curV.clone());
+    field(curV, k1).normalize();
+    tmpV.copy(curV).addScaledVector(k1, step*0.5); field(tmpV, k2).normalize();
+    tmpV.copy(curV).addScaledVector(k2, step*0.5); field(tmpV, k3).normalize();
+    tmpV.copy(curV).addScaledVector(k3, step);     field(tmpV, k4).normalize();
+    dirV.copy(k1).addScaledVector(k2,2).addScaledVector(k3,2).add(k4).multiplyScalar(1/6);
+    if(dirV.lengthSq() < 1e-10) break;
+    dirV.normalize();
+    curV.addScaledVector(dirV, step);
+    // 靠近负磁荷则停止
+    var stop = false;
+    for(var c=0;c<charges.length;c++){
+      if(charges[c].q < 0 && curV.distanceTo(charges[c].p) < 0.16){ stop = true; break; }
+    }
+    if(stop) break;
+    if(curV.length() > maxLen) break;
+  }
+  return pts;
+}
+
+
+// ================= 磁铁模型工具：圆角盒 + 极性标注 =================
+function roundedBox(w, h, d, r){
+  r = Math.min(r, w*0.4, h*0.4);
+  var b = Math.min(0.025, d*0.12, w*0.06);
+  var shape = new THREE.Shape();
+  var hw = w/2 - b, hh = h/2 - b;
+  var rr = Math.max(0.001, r - b);
+  shape.moveTo(-hw+rr, -hh);
+  shape.lineTo(hw-rr, -hh);
+  shape.quadraticCurveTo(hw, -hh, hw, -hh+rr);
+  shape.lineTo(hw, hh-rr);
+  shape.quadraticCurveTo(hw, hh, hw-rr, hh);
+  shape.lineTo(-hw+rr, hh);
+  shape.quadraticCurveTo(-hw, hh, -hw, hh-rr);
+  shape.lineTo(-hw, -hh+rr);
+  shape.quadraticCurveTo(-hw, -hh, -hw+rr, -hh);
+  var geo = new THREE.ExtrudeGeometry(shape, {
+    depth: d - 2*b, bevelEnabled: true, bevelThickness: b, bevelSize: b,
+    bevelSegments: 2, curveSegments: 5, steps: 1
+  });
+  geo.center();
+  return geo;
+}
+
+var _texCache = {};
+function poleTexture(txt, color){
+  var key = txt + color;
+  if(_texCache[key]) return _texCache[key];
+  var c = document.createElement('canvas');
+  c.width = 256; c.height = 256;
+  var g = c.getContext('2d');
+  g.clearRect(0, 0, 256, 256);
+  g.fillStyle = color;
+  g.font = 'bold 200px Arial, Helvetica, sans-serif';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(txt, 128, 142);
+  var t = new THREE.CanvasTexture(c);
+  t.anisotropy = 4;
+  _texCache[key] = t;
+  return t;
+}
+
+function addPoleLabel(parent, txt, color, x, y, z, facing, size){
+  var mat = new THREE.MeshBasicMaterial({
+    map: poleTexture(txt, color), transparent: true, depthWrite: false,
+    clippingPlanes: [clipPlane]
+  });
+  var m = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat);
+  m.position.set(x, y, z);
+  if(facing === 'up')        m.rotation.x = -Math.PI/2;
+  else if(facing === 'down') m.rotation.x =  Math.PI/2;
+  parent.add(m);
+  return m;
+}
+
+// ================= 场景定义 =================
+function makeCharge(x,y,z,q){ return {p:new THREE.Vector3(x,y,z), q:q}; }
+
+var SCENES = {
+  bar: {
+    charges: function(){ return [makeCharge(0,0.62,0,1), makeCharge(0,-0.62,0,-1)]; },
+    seeds: function(){
+      var out=[], R0=0.17, nPhi=8, thetas=[0.35,0.75,1.15,1.55];
+      var pN = charges[0].p;
+      for(var t=0;t<thetas.length;t++){
+        for(var a=0;a<nPhi;a++){
+          var ph=a/nPhi*Math.PI*2, th=thetas[t];
+          out.push(new THREE.Vector3(
+            pN.x + R0*Math.sin(th)*Math.cos(ph),
+            pN.y + R0*Math.cos(th),
+            pN.z + R0*Math.sin(th)*Math.sin(ph)));
+        }
+      }
+      return out;
+    },
+    maxLen: 5.0,
+    boxes: [
+      {c:[0, 0.5, 0], s:[0.62, 1.00, 0.62], color:0xff3b4d},
+      {c:[0,-0.5, 0], s:[0.62, 1.00, 0.62], color:0x3b6cff}
+    ],
+    build: function(){
+      var W=0.62, H=1.0;
+      var geo = roundedBox(W, W, H, 0.085);
+      geo.rotateX(Math.PI/2);
+      var mN = new THREE.MeshStandardMaterial({color:0xff3b4d, emissive:0x8a0d18,
+        emissiveIntensity:0.75, metalness:0.55, roughness:0.26, transparent:true, opacity:0.82, side:THREE.DoubleSide,
+        clippingPlanes:[clipPlane]});
+      var mS = new THREE.MeshStandardMaterial({color:0x3b6cff, emissive:0x0d1f8a,
+        emissiveIntensity:0.75, metalness:0.55, roughness:0.26, transparent:true, opacity:0.82, side:THREE.DoubleSide,
+        clippingPlanes:[clipPlane]});
+      magnetMats.push(mN, mS);
+      var a = new THREE.Mesh(geo, mN); a.position.y =  H/2; root.add(a);
+      var b = new THREE.Mesh(geo, mS); b.position.y = -H/2; root.add(b);
+      addPoleLabel(root, 'N', '#ffd9dd', 0,  H+0.003, 0, 'up',   0.42);
+      addPoleLabel(root, 'S', '#d9e3ff', 0, -H-0.003, 0, 'down', 0.42);
+      // 极面
+      var capGeo = new THREE.BoxGeometry(W*1.03,0.035,W*1.03);
+      var cN = new THREE.Mesh(capGeo, new THREE.MeshBasicMaterial({color:0xff8899,
+        transparent:true, opacity:0.85, clippingPlanes:[clipPlane]}));
+      cN.position.y = H; root.add(cN);
+      var cS = new THREE.Mesh(capGeo, new THREE.MeshBasicMaterial({color:0x88aaff,
+        transparent:true, opacity:0.85, clippingPlanes:[clipPlane]}));
+      cS.position.y = -H; root.add(cS);
+      // 内部磁感线 S->N
+      addInnerLines([[0.17,0],[-0.17,0],[0,0.17],[0,-0.17],[0,0]], -0.94, 0.94);
+    }
+  },
+
+  horseshoe: {
+    charges: function(){ return [makeCharge(-0.72,0.62,0,1), makeCharge(0.72,0.62,0,-1)]; },
+    seeds: function(){
+      var out=[], R0=0.16, nPhi=8, thetas=[0.35,0.8,1.25,1.7];
+      var pN = charges[0].p;
+      for(var t=0;t<thetas.length;t++){
+        for(var a=0;a<nPhi;a++){
+          var ph=a/nPhi*Math.PI*2, th=thetas[t];
+          out.push(new THREE.Vector3(
+            pN.x + R0*Math.sin(th)*Math.cos(ph),
+            pN.y + R0*Math.cos(th),
+            pN.z + R0*Math.sin(th)*Math.sin(ph)));
+        }
+      }
+      return out;
+    },
+    maxLen: 6.0,
+    boxes: [
+      {c:[-0.72, 0.055, 0], s:[0.34, 1.15, 0.34], color:0xff3b4d},
+      {c:[ 0.72, 0.055, 0], s:[0.34, 1.15, 0.34], color:0x3b6cff},
+      {c:[0, -0.52, 0], s:[1.78, 0.34, 0.34], color:0x8a8f99}
+    ],
+    build: function(){
+      var W=0.34, armH=1.15, baseY=-0.52, gapX=0.72;
+      var geoArm = roundedBox(W, W, armH, 0.06); geoArm.rotateX(Math.PI/2);
+      var geoBase = roundedBox(W, W, gapX*2+W, 0.06); geoBase.rotateY(Math.PI/2);
+      var mN = new THREE.MeshStandardMaterial({color:0xff3b4d, emissive:0x8a0d18,
+        emissiveIntensity:0.75, metalness:0.55, roughness:0.26, transparent:true, opacity:0.84, side:THREE.DoubleSide,
+        clippingPlanes:[clipPlane]});
+      var mS = new THREE.MeshStandardMaterial({color:0x3b6cff, emissive:0x0d1f8a,
+        emissiveIntensity:0.75, metalness:0.55, roughness:0.26, transparent:true, opacity:0.84, side:THREE.DoubleSide,
+        clippingPlanes:[clipPlane]});
+      var mB = new THREE.MeshStandardMaterial({color:0x8a8f99, emissive:0x1a1f26,
+        emissiveIntensity:0.4, metalness:0.8, roughness:0.32, transparent:true, opacity:0.92,
+        clippingPlanes:[clipPlane]});
+      magnetMats.push(mN, mS);
+      var left = new THREE.Mesh(geoArm, mN); left.position.set(-gapX, baseY+armH/2, 0); root.add(left);
+      var right = new THREE.Mesh(geoArm, mS); right.position.set(gapX, baseY+armH/2, 0); root.add(right);
+      var base = new THREE.Mesh(geoBase, mB); base.position.set(0, baseY, 0); root.add(base);
+      addPoleLabel(root, 'N', '#ffd9dd', -gapX, baseY+armH+0.003, 0, 'up', 0.26);
+      addPoleLabel(root, 'S', '#d9e3ff',  gapX, baseY+armH+0.003, 0, 'up', 0.26);
+      // 极面
+      var capGeo = new THREE.BoxGeometry(W*1.05,0.03,W*1.05);
+      var cN = new THREE.Mesh(capGeo, new THREE.MeshBasicMaterial({color:0xff8899,
+        transparent:true, opacity:0.9, clippingPlanes:[clipPlane]}));
+      cN.position.set(-gapX, baseY+armH, 0); root.add(cN);
+      var cS = new THREE.Mesh(capGeo, new THREE.MeshBasicMaterial({color:0x88aaff,
+        transparent:true, opacity:0.9, clippingPlanes:[clipPlane]}));
+      cS.position.set(gapX, baseY+armH, 0); root.add(cS);
+      // 内部磁感线（两臂内竖直）
+      addInnerLinesAt(-gapX, 0, baseY, baseY+armH);
+      addInnerLinesAt(gapX, 0, baseY, baseY+armH);
+    }
+  },
+
+  solenoid: {
+    charges: function(){ return [makeCharge(0,0.85,0,1), makeCharge(0,-0.85,0,-1)]; },
+    seeds: function(){
+      var out=[], R0=0.18, nPhi=8, thetas=[0.35,0.75,1.15,1.55];
+      var pN = charges[0].p;
+      for(var t=0;t<thetas.length;t++){
+        for(var a=0;a<nPhi;a++){
+          var ph=a/nPhi*Math.PI*2, th=thetas[t];
+          out.push(new THREE.Vector3(
+            pN.x + R0*Math.sin(th)*Math.cos(ph),
+            pN.y + R0*Math.cos(th),
+            pN.z + R0*Math.sin(th)*Math.sin(ph)));
+        }
+      }
+      return out;
+    },
+    maxLen: 5.0,
+    boxes: [
+      {c:[0, 0, 0], s:[0.92, 2.10, 0.92], color:0x9aa7b8, circle:0.46}
+    ],
+    build: function(){
+      var R=0.46, H=2.1;
+      var cyl = new THREE.Mesh(
+        new THREE.CylinderGeometry(R,R,H,32,1,true),
+        new THREE.MeshStandardMaterial({color:0x9aa7b8, emissive:0x101820,
+          emissiveIntensity:0.3, metalness:0.6, roughness:0.4,
+          transparent:true, opacity:0.16, side:THREE.DoubleSide, clippingPlanes:[clipPlane]}));
+      root.add(cyl);
+      // 线圈
+      var coilMat = new THREE.MeshStandardMaterial({color:0xffb347, emissive:0x7a4a00,
+        emissiveIntensity:0.8, metalness:0.8, roughness:0.3, clippingPlanes:[clipPlane]});
+      var turns = 16;
+      for(var i=0;i<turns;i++){
+        var y = -H/2 + (i+0.5)*H/turns;
+        var torus = new THREE.Mesh(new THREE.TorusGeometry(R+0.02, 0.028, 8, 28), coilMat);
+        torus.rotation.x = Math.PI/2; torus.position.y = y; root.add(torus);
+      }
+      // 两端极面
+      var capGeo = new THREE.CircleGeometry(R, 32);
+      var cN = new THREE.Mesh(capGeo, new THREE.MeshBasicMaterial({color:0xff8899,
+        transparent:true, opacity:0.5, side:THREE.DoubleSide, clippingPlanes:[clipPlane]}));
+      cN.rotation.x = -Math.PI/2; cN.position.y = H/2; root.add(cN);
+      var cS = new THREE.Mesh(capGeo, new THREE.MeshBasicMaterial({color:0x88aaff,
+        transparent:true, opacity:0.5, side:THREE.DoubleSide, clippingPlanes:[clipPlane]}));
+      cS.rotation.x = -Math.PI/2; cS.position.y = -H/2; root.add(cS);
+      addPoleLabel(root, 'N', '#ffd9dd', 0,  H/2+0.004, 0, 'up',   0.42);
+      addPoleLabel(root, 'S', '#d9e3ff', 0, -H/2-0.004, 0, 'down', 0.42);
+      // 内部磁感线
+      addInnerLines([[0.18,0],[-0.18,0],[0,0.18],[0,-0.18],[0,0]], -H/2*0.94, H/2*0.94);
+    }
+  }
+};
+
+// 内部磁感线辅助
+var innerMatBase = {color:0x2bb8d6, transparent:true, opacity:0.6,
+  blending:THREE.AdditiveBlending, depthWrite:false};
+function addInnerLines(offsets, y0, y1){
+  for(var i=0;i<offsets.length;i++){
+    var m = new THREE.LineBasicMaterial(Object.assign({}, innerMatBase, {clippingPlanes:[clipPlane]}));
+    var pts = [new THREE.Vector3(offsets[i][0], y0, offsets[i][1]),
+               new THREE.Vector3(offsets[i][0], y1, offsets[i][1])];
+    var g = new THREE.BufferGeometry().setFromPoints(pts);
+    root.add(new THREE.Line(g, m));
+  }
+}
+function addInnerLinesAt(x, z, y0, y1){
+  var offs = [[0,0],[0.09,0],[-0.09,0],[0,0.09],[0,-0.09]];
+  for(var i=0;i<offs.length;i++){
+    var m = new THREE.LineBasicMaterial(Object.assign({}, innerMatBase, {clippingPlanes:[clipPlane]}));
+    var pts = [new THREE.Vector3(x+offs[i][0], y0, z+offs[i][1]),
+               new THREE.Vector3(x+offs[i][0], y1, z+offs[i][1])];
+    var g = new THREE.BufferGeometry().setFromPoints(pts);
+    root.add(new THREE.Line(g, m));
+  }
+}
+
+// ================= 构建 / 清空场景 =================
+function disposeRoot(){
+  for(var i=root.children.length-1;i>=0;i--){
+    var o = root.children[i];
+    root.remove(o);
+    if(o.geometry) o.geometry.dispose();
+    if(o.material){
+      if(Array.isArray(o.material)) o.material.forEach(function(m){m.dispose();});
+      else o.material.dispose();
+    }
+  }
+  lines = []; lineMeshes = []; lineMats = []; magnetMats = [];
+  particles = null; pGeo = null; prog = null; hlIndex = -1;
+}
+
+function buildScene(name){
+  disposeRoot();
+  var S = SCENES[name];
+  charges = S.charges();
+  S.build();
+
+  // 生成磁感线
+  var seeds = S.seeds();
+  for(var i=0;i<seeds.length;i++){
+    var pts = trace(seeds[i], S.maxLen);
+    if(pts.length > 15) lines.push(pts);
+  }
+
+  // 绘制磁感线（每条独立材质）
+  var baseOpacity = 0.4;
+  for(var k=0;k<lines.length;k++){
+    var mat = new THREE.LineBasicMaterial({
+      color:0x38e8ff, transparent:true, opacity:baseOpacity,
+      blending:THREE.AdditiveBlending, depthWrite:false, clippingPlanes:[clipPlane]});
+    var g = new THREE.BufferGeometry().setFromPoints(lines[k]);
+    var mesh = new THREE.Line(g, mat);
+    root.add(mesh);
+    lineMeshes.push(mesh); lineMats.push(mat);
+  }
+
+  // 粒子
+  pGeo = new THREE.BufferGeometry();
+  var pPos = new Float32Array(lines.length*3);
+  pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+  var pMat = new THREE.PointsMaterial({color:0xc8f8ff, size:0.13, transparent:true,
+    opacity:0.95, blending:THREE.AdditiveBlending, depthWrite:false, sizeAttenuation:true});
+  particles = new THREE.Points(pGeo, pMat);
+  root.add(particles);
+  prog = new Float32Array(lines.length);
+  for(var q=0;q<prog.length;q++) prog[q] = Math.random();
+
+  applyStrength();
+  curScene = name;
+  applyCut();
+}
+
+// ================= 强度应用 =================
+function applyStrength(){
+  for(var i=0;i<magnetMats.length;i++){
+    magnetMats[i].emissiveIntensity = 0.45 + strength*0.35;
+  }
+  for(var j=0;j<lineMats.length;j++){
+    if(j !== hlIndex) lineMats[j].opacity = 0.26 + strength*0.16;
+  }
+  if(particles) particles.material.size = 0.10 + strength*0.05;
+}
+
+// ================= 粒子更新 =================
+var _samp = new THREE.Vector3();
+function updateParticles(dt){
+  if(!particles) return;
+  var posAttr = pGeo.attributes.position;
+  var spd = 0.09 + strength*0.06;
+  for(var i=0;i<lines.length;i++){
+    prog[i] += dt * (spd + 0.004*i);
+    if(prog[i] > 1) prog[i] -= 1;
+    var pts = lines[i], n = pts.length;
+    var f = prog[i]*(n-1);
+    var i0 = Math.floor(f), i1 = Math.min(i0+1, n-1), fr = f-i0;
+    _samp.lerpVectors(pts[i0], pts[i1], fr);
+    posAttr.array[i*3]   = _samp.x;
+    posAttr.array[i*3+1] = _samp.y;
+    posAttr.array[i*3+2] = _samp.z;
+  }
+  posAttr.needsUpdate = true;
+}
+
+// ================= 相机控制 =================
+var theta = 0.75, phi = 1.12, radius = 9.5;
+var vTheta = 0, vPhi = 0;
+var dragging = false;
+var autoRotate = true, idleTime = 0;
+
+function updateCam(){
+  phi = Math.max(0.22, Math.min(Math.PI-0.22, phi));
+  radius = Math.max(3.2, Math.min(18, radius));
+  camera.position.set(
+    radius*Math.sin(phi)*Math.sin(theta),
+    radius*Math.cos(phi),
+    radius*Math.sin(phi)*Math.cos(theta));
+  camera.lookAt(0,0,0);
+}
+updateCam();
+
+var pointers = new Map();
+var pinchDist = 0;
+var downX = 0, downY = 0, downT = 0, moved = 0;
+
+function twoFingerDist(){
+  var arr = Array.from(pointers.values());
+  if(arr.length < 2) return 0;
+  var dx = arr[0].x-arr[1].x, dy = arr[0].y-arr[1].y;
+  return Math.sqrt(dx*dx+dy*dy);
+}
+
+canvas.addEventListener('pointerdown', function(e){
+  try{ canvas.setPointerCapture(e.pointerId); }catch(err){}
+  if(mode === 'induction' && pointers.size === 0 && pickRod(e.clientX, e.clientY)){
+    var pp = screenToDragPlane(e.clientX, e.clientY, _dragPt);
+    if(pp){
+      rodDragging = true;
+      dragOffX = rodTargetX - pp.x;
+      dragOffY = rodTargetY - pp.y;
+      autoRotate = false; idleTime = 0;
+      return;
+    }
+  }
+  pointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  if(pointers.size === 1){
+    dragging = true; downX = e.clientX; downY = e.clientY;
+    downT = performance.now(); moved = 0;
+    vTheta = 0; vPhi = 0;
+  }
+  if(pointers.size === 2) pinchDist = twoFingerDist();
+  autoRotate = false; idleTime = 0;
+}, {passive:true});
+
+canvas.addEventListener('pointermove', function(e){
+  if(rodDragging){
+    var pm = screenToDragPlane(e.clientX, e.clientY, _dragPt);
+    if(pm){
+      rodTargetX = Math.max(rodMinX, Math.min(rodMaxX, pm.x + dragOffX));
+      rodTargetY = Math.max(rodMinY, Math.min(rodMaxY, pm.y + dragOffY));
+    }
+    return;
+  }
+  if(!pointers.has(e.pointerId)) return;
+  var prev = pointers.get(e.pointerId);
+  var dx = e.clientX - prev.x, dy = e.clientY - prev.y;
+  pointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  moved += Math.abs(dx) + Math.abs(dy);
+
+  if(pointers.size === 1 && dragging){
+    var k = 0.0062;
+    theta -= dx*k; phi -= dy*k;
+    vTheta = -dx*k; vPhi = -dy*k;
+    updateCam();
+  } else if(pointers.size === 2){
+    var d = twoFingerDist();
+    if(pinchDist > 0 && d > 0){ radius *= pinchDist/d; updateCam(); }
+    pinchDist = d;
+  }
+}, {passive:true});
+
+function endPointer(e){
+  if(rodDragging){ rodDragging = false; return; }
+  var wasSingle = (pointers.size === 1);
+  pointers.delete(e.pointerId);
+  if(pointers.size < 2) pinchDist = 0;
+  if(pointers.size === 0){
+    dragging = false;
+    // 判定为点击
+    if(wasSingle && moved < 10 && (performance.now()-downT) < 400){
+      handleTap(e.clientX, e.clientY);
+    }
+  }
+}
+canvas.addEventListener('pointerup', endPointer, {passive:true});
+canvas.addEventListener('pointercancel', endPointer, {passive:true});
+canvas.addEventListener('pointerleave', endPointer, {passive:true});
+
+canvas.addEventListener('wheel', function(e){
+  e.preventDefault();
+  radius *= (1 + (e.deltaY>0 ? 0.08 : -0.08));
+  updateCam(); autoRotate = false; idleTime = 0;
+}, {passive:false});
+
+// ================= 点击高亮 =================
+var raycaster = new THREE.Raycaster();
+raycaster.params.Line.threshold = 0.16;
+var ndc = new THREE.Vector2();
+
+function handleTap(cx, cy){
+  ndc.x = (cx/window.innerWidth)*2 - 1;
+  ndc.y = -(cy/window.innerHeight)*2 + 1;
+  raycaster.setFromCamera(ndc, camera);
+  var hits = raycaster.intersectObjects(lineMeshes, false);
+  if(hits.length > 0){
+    var idx = lineMeshes.indexOf(hits[0].object);
+    setHighlight(idx === hlIndex ? -1 : idx);
+  } else {
+    setHighlight(-1);
+  }
+}
+
+function setHighlight(idx){
+  if(hlIndex >= 0 && lineMats[hlIndex]){
+    lineMats[hlIndex].color.setHex(0x38e8ff);
+    lineMats[hlIndex].opacity = 0.26 + strength*0.16;
+  }
+  hlIndex = idx;
+  if(idx >= 0 && lineMats[idx]){
+    lineMats[idx].color.setHex(0xffe066);
+    lineMats[idx].opacity = 1.0;
+  }
+}
+
+// ================= UI 绑定 =================
+var cutEl = document.getElementById('cut');
+var cutV = document.getElementById('cutv');
+var strEl = document.getElementById('str');
+var strV = document.getElementById('strv');
+
+cutEl.addEventListener('input', applyCut);
+
+// ================= 剖面方向（X / Y / Z 三向） =================
+var cutAxis = 'z';
+var AXIS_NORMAL = {
+  x: new THREE.Vector3(-1, 0, 0),
+  y: new THREE.Vector3(0, -1, 0),
+  z: new THREE.Vector3(0, 0, -1)
+};
+// 每个场景沿各轴的半尺寸，用于让滑块行程贴合磁铁实际大小
+var SCENE_EXT = {
+  bar:       { x: 0.31, y: 1.00, z: 0.31 },
+  horseshoe: { x: 0.89, y: 0.75, z: 0.17 },
+  solenoid:  { x: 0.46, y: 1.05, z: 0.46 }
+};
+var curScene = 'bar';
+
+function applyCut(){
+  var v = parseFloat(cutEl.value)/100;   // 0..1
+  clipPlane.normal.copy(AXIS_NORMAL[cutAxis]);
+  var ext = (SCENE_EXT[curScene] || SCENE_EXT.bar)[cutAxis];
+  // v=0 完全不切；v 增大则 constant 从 +ext 线性降到 -ext
+  clipPlane.constant = (v < 0.005) ? 100 : ext * (1 - 2*v);
+  cutV.textContent = v < 0.005 ? '关' : Math.round(v*100)+'%';
+  updateCaps();
+}
+
+// 在切口位置补上"实心截面"，否则切开的磁铁只是空壳
+function updateCaps(){
+  for(var i=capGroup.children.length-1;i>=0;i--){
+    var o = capGroup.children[i];
+    capGroup.remove(o);
+    if(o.geometry) o.geometry.dispose();
+    if(o.material) o.material.dispose();
+  }
+  var v = parseFloat(cutEl.value)/100;
+  if(v < 0.005) return;
+
+  var def = SCENES[curScene];
+  if(!def || !def.boxes) return;
+  var cpos = clipPlane.constant;
+  var ai = (cutAxis==='x') ? 0 : (cutAxis==='y' ? 1 : 2);
+
+  for(var k=0;k<def.boxes.length;k++){
+    var b = def.boxes[k], c = b.c, sz = b.s;
+    // 该组件没被切到就跳过
+    if(Math.abs(cpos - c[ai]) > sz[ai]/2) continue;
+
+    var geo, w, h;
+    if(cutAxis==='y' && b.circle){
+      geo = new THREE.CircleGeometry(b.circle, 40);
+    } else {
+      if(cutAxis==='x'){ w = sz[2]; h = sz[1]; }
+      else if(cutAxis==='y'){ w = sz[0]; h = sz[2]; }
+      else { w = sz[0]; h = sz[1]; }
+      geo = new THREE.PlaneGeometry(w, h);
+    }
+
+    var mat = new THREE.MeshBasicMaterial({
+      color: b.color, side: THREE.DoubleSide, transparent:true, opacity:0.95
+    });
+    var m = new THREE.Mesh(geo, mat);
+
+    if(cutAxis==='x'){
+      m.rotation.y = Math.PI/2;
+      m.position.set(cpos, c[1], c[2]);
+    } else if(cutAxis==='y'){
+      m.rotation.x = -Math.PI/2;
+      m.position.set(c[0], cpos, c[2]);
+    } else {
+      m.position.set(c[0], c[1], cpos);
+    }
+    capGroup.add(m);
+  }
+}
+
+var axBtns = document.querySelectorAll('#axes button');
+for(var ai=0; ai<axBtns.length; ai++){
+  axBtns[ai].addEventListener('click', function(){
+    for(var j=0;j<axBtns.length;j++) axBtns[j].classList.remove('active');
+    this.classList.add('active');
+    cutAxis = this.getAttribute('data-a');
+    applyCut();
+  });
+}
+
+strEl.addEventListener('input', function(){
+  strength = parseFloat(strEl.value)/100;
+  strV.textContent = strength.toFixed(1)+'×';
+  applyStrength();
+});
+
+var sceneBtns = document.querySelectorAll('#scenes button');
+for(var bi=0; bi<sceneBtns.length; bi++){
+  sceneBtns[bi].addEventListener('click', function(){
+    for(var j=0;j<sceneBtns.length;j++) sceneBtns[j].classList.remove('active');
+    this.classList.add('active');
+    buildScene(this.getAttribute('data-s'));
+  });
+}
+
+
+// ================= 模式切换 & 电磁感应模块 =================
+var mode = 'field';
+var inductionGroup = new THREE.Group();
+scene.add(inductionGroup);
+inductionGroup.visible = false;
+
+var panelField = document.getElementById('panel');
+var panelInd   = document.getElementById('panelInd');
+var meterEl    = document.getElementById('meter');
+var needleEl   = document.getElementById('needle');
+var meterValEl = document.getElementById('meterVal');
+var meterDirEl = document.getElementById('meterDir');
+var vValEl = document.getElementById('vVal');
+var eValEl = document.getElementById('eVal');
+var iValEl = document.getElementById('iVal');
+var indHintEl = document.getElementById('indHint');
+
+var inductionBuilt = false;
+var rodMesh = null, arrowGroup = null, wireA = null, wireB = null;
+var flowDots = [], flowSpeed = 0;
+var rodX = 0, rodY = 0, rodTargetX = 0, rodTargetY = 0;
+var rodMinX = -0.40, rodMaxX = 1.12, rodMinY = -0.46, rodMaxY = 0.46;
+var rodDragging = false, dragOffX = 0, dragOffY = 0;
+var WIRE_L = 0.88;
+var FIELD = { x0: -0.24, x1: 1.04, y0: -0.44, y1: 0.44 };
+var IND = { B: 0.5, R: 0.5 };
+
+function buildInduction(){
+  // --- 蹄形磁铁：开口朝右，上 N 下 S，中间磁场竖直向下 ---
+  var mN = new THREE.MeshStandardMaterial({color:0xff3b4d, emissive:0x8a0d18,
+    emissiveIntensity:0.7, metalness:0.35, roughness:0.3, transparent:true, opacity:0.88});
+  var mS = new THREE.MeshStandardMaterial({color:0x3b6cff, emissive:0x0d1f8a,
+    emissiveIntensity:0.7, metalness:0.35, roughness:0.3, transparent:true, opacity:0.88});
+  var mB = new THREE.MeshStandardMaterial({color:0x8a8f99, emissive:0x1a1f26,
+    emissiveIntensity:0.3, metalness:0.7, roughness:0.45});
+
+  var armGeo = new THREE.BoxGeometry(1.72, 0.26, 0.52);
+  var up = new THREE.Mesh(armGeo, mN); up.position.set(0.34,  0.63, 0);
+  var dn = new THREE.Mesh(armGeo, mS); dn.position.set(0.34, -0.63, 0);
+  var bk = new THREE.Mesh(new THREE.BoxGeometry(0.26, 1.52, 0.52), mB);
+  bk.position.set(-0.56, 0, 0);
+  inductionGroup.add(up); inductionGroup.add(dn); inductionGroup.add(bk);
+
+  // --- 电流表外壳 ---
+  var boxMat = new THREE.MeshStandardMaterial({color:0x2a3a4a, metalness:0.6, roughness:0.5,
+    emissive:0x0a1520, emissiveIntensity:0.4});
+  var box = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.30, 0.56), boxMat);
+  box.position.set(1.66, 0, 0);
+  inductionGroup.add(box);
+
+  // --- 磁感线（竖直向下，只画在磁场区内）---
+  var lm = new THREE.LineBasicMaterial({color:0x38e8ff, transparent:true, opacity:0.4,
+    blending:THREE.AdditiveBlending, depthWrite:false});
+  for(var i=0;i<5;i++){
+    for(var j=-1;j<=1;j++){
+      var px = -0.22 + i*0.31, pz = j*0.30;
+      var g = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(px,  0.48, pz),
+        new THREE.Vector3(px, -0.48, pz)]);
+      inductionGroup.add(new THREE.Line(g, lm));
+    }
+  }
+
+  // --- 电线（可任意拖动的导体）---
+  var rodMat = new THREE.MeshStandardMaterial({color:0xc87f2e, emissive:0x6a3d00,
+    emissiveIntensity:0.55, metalness:0.85, roughness:0.32});
+  rodMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, WIRE_L, 14), rodMat);
+  rodMesh.rotation.x = Math.PI/2;
+  rodMesh.position.set(rodX, rodY, 0);
+  inductionGroup.add(rodMesh);
+
+  // --- 两根软导线：电线两端 -> 电流表 ---
+  var wireMat = new THREE.LineBasicMaterial({color:0xd08a3a, transparent:true, opacity:0.75});
+  wireA = new THREE.Line(new THREE.BufferGeometry(), wireMat);
+  wireB = new THREE.Line(new THREE.BufferGeometry(), wireMat);
+  inductionGroup.add(wireA); inductionGroup.add(wireB);
+
+  // --- 电流方向箭头（细箭头，排在电线两端外侧，避免和电线重叠）---
+  arrowGroup = new THREE.Group();
+  var arrowMat = new THREE.MeshBasicMaterial({color:0xffe066});
+  var arrowZ = [-0.62, -0.48, 0.48, 0.62];
+  for(var k=0;k<arrowZ.length;k++){
+    var a = new THREE.Mesh(new THREE.ConeGeometry(0.032, 0.125, 8), arrowMat);
+    a.userData.baseZ = arrowZ[k];
+    arrowGroup.add(a);
+  }
+  arrowGroup.visible = false;
+  inductionGroup.add(arrowGroup);
+
+  // --- 电流流动光点 ---
+  flowDots = [];
+  var dotMat = new THREE.MeshBasicMaterial({color:0xfff2b0});
+  for(var d=0;d<7;d++){
+    var dot = new THREE.Mesh(new THREE.SphereGeometry(0.026, 8, 8), dotMat);
+    dot.visible = false;
+    flowDots.push(dot);
+    inductionGroup.add(dot);
+  }
+}
+
+function setWireLine(line, p0, p1){
+  var mid = new THREE.Vector3().addVectors(p0, p1).multiplyScalar(0.5);
+  mid.y += 0.38;
+  var curve = new THREE.QuadraticBezierCurve3(p0, mid, p1);
+  var pts = curve.getPoints(14);
+  if(line.geometry) line.geometry.dispose();
+  line.geometry = new THREE.BufferGeometry().setFromPoints(pts);
+}
+
+function updateInduction(dt){
+  var px = rodX, py = rodY;
+  rodX += (rodTargetX - rodX) * Math.min(1, dt*18);
+  rodY += (rodTargetY - rodY) * Math.min(1, dt*18);
+
+  var vx = (rodX - px) / Math.max(dt, 0.0001);
+  var vy = (rodY - py) / Math.max(dt, 0.0001);
+  vx = Math.max(-3.5, Math.min(3.5, vx));
+  vy = Math.max(-3.5, Math.min(3.5, vy));
+
+  if(rodMesh) rodMesh.position.set(rodX, rodY, 0);
+
+  // 软导线跟随
+  if(wireA && wireB){
+    setWireLine(wireA,
+      new THREE.Vector3(rodX, rodY,  WIRE_L/2),
+      new THREE.Vector3(1.66, 0,  0.20));
+    setWireLine(wireB,
+      new THREE.Vector3(rodX, rodY, -WIRE_L/2),
+      new THREE.Vector3(1.66, 0, -0.20));
+  }
+
+  // 是否处在磁场区域内
+  var inField = (rodX > FIELD.x0 && rodX < FIELD.x1 &&
+                 rodY > FIELD.y0 && rodY < FIELD.y1);
+
+  // 只有垂直于 B 且垂直于电线的速度分量 vx 才切割磁感线
+  var E = inField ? (IND.B * WIRE_L * vx) : 0;
+  var I = E / IND.R;
+
+  vValEl.textContent = Math.abs(vx).toFixed(2);
+  eValEl.textContent = Math.abs(E).toFixed(2);
+  iValEl.textContent = Math.abs(I).toFixed(2);
+
+  // 提示文字
+  if(indHintEl){
+    if(!inField) indHintEl.textContent = '已移出磁场 · 没有感应电流';
+    else if(Math.abs(I) < 0.04) indHintEl.textContent = '在磁场中 · 左右移动才会切割磁感线';
+    else indHintEl.textContent = '正在切割磁感线 · 产生感应电流';
+  }
+
+  // 电流表指针
+  var ang = Math.max(-70, Math.min(70, I * 22));
+  var rad = ang * Math.PI / 180;
+  needleEl.setAttribute('x2', (50 + 30*Math.sin(rad)).toFixed(2));
+  needleEl.setAttribute('y2', (58 - 30*Math.cos(rad)).toFixed(2));
+  meterValEl.textContent = Math.abs(I).toFixed(2) + ' A';
+  meterDirEl.textContent = (Math.abs(I) < 0.03) ? '—'
+      : (I > 0 ? '电流 → 向里' : '电流 ← 向外');
+
+  // 电流箭头
+  var dir = (I > 0) ? -1 : 1;         // I>0 -> 电流沿 -z
+  var showArrow = Math.abs(I) > 0.03;
+  if(arrowGroup){
+    arrowGroup.visible = showArrow;
+    if(showArrow){
+      arrowGroup.position.set(rodX, rodY, 0);
+      var sc = 0.75 + Math.min(Math.abs(I), 2.6) * 0.22;
+      for(var k=0;k<arrowGroup.children.length;k++){
+        var a = arrowGroup.children[k];
+        a.position.z = a.userData.baseZ;
+        a.rotation.x = (dir > 0) ? -Math.PI/2 : Math.PI/2;
+        a.scale.set(sc, sc, sc);
+      }
+    }
+  }
+
+  // 流动光点
+  if(flowDots && flowDots.length){
+    flowSpeed += dt * (0.6 + Math.min(Math.abs(I), 2.6) * 0.9);
+    for(var d=0; d<flowDots.length; d++){
+      var dot = flowDots[d];
+      if(!showArrow){ dot.visible = false; continue; }
+      dot.visible = true;
+      var f = (flowSpeed + d/flowDots.length) % 1;
+      var zz = (f - 0.5) * WIRE_L * dir;
+      dot.position.set(rodX, rodY, zz);
+    }
+  }
+}
+
+var _ray2 = new THREE.Raycaster();
+var _ndc2 = new THREE.Vector2();
+var _dragPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+var _dragPt = new THREE.Vector3();
+
+function screenToDragPlane(cx, cy, out){
+  _ndc2.x = (cx / window.innerWidth) * 2 - 1;
+  _ndc2.y = -(cy / window.innerHeight) * 2 + 1;
+  _ray2.setFromCamera(_ndc2, camera);
+  return _ray2.ray.intersectPlane(_dragPlane, out);
+}
+
+function pickRod(cx, cy){
+  if(!rodMesh) return false;
+  _ndc2.x = (cx/window.innerWidth)*2 - 1;
+  _ndc2.y = -(cy/window.innerHeight)*2 + 1;
+  _ray2.setFromCamera(_ndc2, camera);
+  if(_ray2.intersectObject(rodMesh, false).length > 0) return true;
+  var p = rodMesh.position.clone();
+  p.project(camera);
+  var sx = (p.x*0.5 + 0.5) * window.innerWidth;
+  var sy = (-p.y*0.5 + 0.5) * window.innerHeight;
+  return Math.sqrt((cx-sx)*(cx-sx) + (cy-sy)*(cy-sy)) < 62;
+}
+
+function setMode(m){
+  mode = m;
+  var bs = document.querySelectorAll('#tabs button');
+  for(var i=0;i<bs.length;i++){
+    bs[i].classList.toggle('active', bs[i].getAttribute('data-m') === m);
+  }
+  var isField = (m === 'field');
+  root.visible = isField;
+  capGroup.visible = isField;
+  inductionGroup.visible = !isField;
+  panelField.style.display = isField ? '' : 'none';
+  panelInd.style.display   = isField ? 'none' : '';
+  meterEl.style.display    = isField ? 'none' : '';
+
+  if(!isField && !inductionBuilt){ buildInduction(); inductionBuilt = true; }
+
+  radius = isField ? 9.5 : 6.8;
+  theta  = isField ? 0.75 : 0.55;
+  phi    = isField ? 1.12 : 1.28;
+  updateCam();
+  autoRotate = isField;
+  idleTime = 0;
+}
+
+var tabBtns = document.querySelectorAll('#tabs button');
+for(var ti=0; ti<tabBtns.length; ti++){
+  tabBtns[ti].addEventListener('click', function(){
+    setMode(this.getAttribute('data-m'));
+  });
+}
+document.getElementById('resetRod').addEventListener('click', function(){
+  rodTargetX = 0; rodTargetY = 0; rodX = 0; rodY = 0; flowSpeed = 0;
+});
+
+// ================= 主循环 =================
+var clock = new THREE.Clock();
+var fpsEl = document.getElementById('fps');
+var fpsAcc = 0, fpsCnt = 0, tAll = 0;
+
+function animate(){
+  requestAnimationFrame(animate);
+  var dt = Math.min(clock.getDelta(), 0.05);
+  tAll += dt;
+
+  if(!dragging){
+    if(Math.abs(vTheta) > 1e-5 || Math.abs(vPhi) > 1e-5){
+      theta += vTheta; phi += vPhi;
+      vTheta *= 0.94; vPhi *= 0.94;
+      updateCam();
+    } else {
+      idleTime += dt;
+      if(idleTime > 1.2) autoRotate = true;
+    }
+  }
+  if(autoRotate && !dragging){ theta += dt*0.22; updateCam(); }
+
+  // 高亮呼吸
+  if(hlIndex >= 0 && lineMats[hlIndex]){
+    lineMats[hlIndex].opacity = 0.62 + 0.38*Math.sin(tAll*6);
+  }
+
+  if(mode === 'induction') updateInduction(dt);
+  else updateParticles(dt);
+  renderer.render(scene, camera);
+
+  fpsAcc += dt; fpsCnt++;
+  if(fpsAcc >= 0.5){
+    fpsEl.textContent = Math.round(fpsCnt/fpsAcc)+' FPS';
+    fpsAcc = 0; fpsCnt = 0;
+  }
+}
+
+// ================= 启动 =================
+buildScene('bar');
+animate();
+
+window.addEventListener('resize', function(){
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+})();
+</script>
+</body>
+</html>
